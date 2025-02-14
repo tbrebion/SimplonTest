@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-# Connexion à la base de données SQLite
+
 try:
     conn = sqlite3.connect('/app/db/database.db')
     print("Successfully connected to database")
@@ -16,7 +16,7 @@ cursor.execute('DROP TABLE IF EXISTS products')
 cursor.execute('DROP TABLE IF EXISTS stores')
 cursor.execute('DROP TABLE IF EXISTS analysis_results')
 
-# Création des tables
+
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS sales (
     id TEXT PRIMARY KEY,
@@ -55,14 +55,16 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 
 conn.commit()
 
-# Fonction pour importer les données à partir des fichiers CSV
+
+
 def import_data_from_csv(file_path, table_name, column_mapping, dtype_mapping):
     df = pd.read_csv(file_path)
     df.rename(columns=column_mapping, inplace=True)
     df = df.astype(dtype_mapping)
     df.to_sql(table_name, conn, if_exists='append', index=False)
 
-# Mapping des colonnes et des types de données pour chaque table
+
+
 sales_column_mapping = {
     'Date': 'date',
     'ID Référence produit': 'product_id',
@@ -109,12 +111,6 @@ import_data_from_csv('/app/data/stores.csv', 'stores', stores_column_mapping, st
 
 
 cursor.execute('''
-SELECT SUM(amount) FROM sales
-''')
-total_revenue = cursor.fetchone()[0]
-
-
-cursor.execute('''
 SELECT product_id, SUM(amount) FROM sales GROUP BY product_id
 ''')
 sales_by_product = cursor.fetchall()
@@ -129,18 +125,14 @@ price_dict = {product_id: price for product_id, price in price_by_product}
 result = {product_id: total_sales * price_dict[product_id] for product_id, total_sales in sales_by_product}
 
 cursor.execute('''
-SELECT stores.city, SUM(sales.amount)
+SELECT stores.city, SUM(sales.amount * products.price) AS total_revenue
 FROM sales
 JOIN stores ON sales.store_id = stores.id
+JOIN products ON sales.product_id = products.product_id
 GROUP BY stores.city
 ''')
 sales_by_region = cursor.fetchall()
 
-
-
-# cursor.execute('''
-# INSERT INTO analysis_results (metric, value) VALUES (?, ?)
-# ''', ('total_revenue', total_revenue))
 
 total = sum(result.values())
 
@@ -154,10 +146,6 @@ for product_id, value in result.items():
     INSERT INTO analysis_results (metric, value) VALUES (?, ?)
     ''', (f'sales_product_{product_id}', value))
 
-# for product_id, amount in sales_by_product:
-#     cursor.execute('''
-#     INSERT INTO analysis_results (metric, value) VALUES (?, ?)
-#     ''', (f'sales_product_{product_id}', amount))
 
 for city, amount in sales_by_region:
     cursor.execute('''
