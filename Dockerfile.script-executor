@@ -1,0 +1,30 @@
+# Dockerfile pour script-executor
+# FROM python:3.9-slim
+
+# WORKDIR /app
+
+# RUN mkdir -p /root/db && \
+#     chmod 777 /root/db
+
+# COPY scripts/requirements.txt requirements.txt
+# RUN pip install -r requirements.txt
+
+# COPY scripts/ .
+
+# CMD ["python", "hello_world.py"]
+
+
+FROM python:3.9-slim
+
+# Create app directory and set permissions
+RUN mkdir -p /app/db && \
+    chown -R 1000:1000 /app
+
+WORKDIR /app
+
+COPY scripts/requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+
+COPY scripts/ .
+
+CMD ["python", "hello_world.py"]

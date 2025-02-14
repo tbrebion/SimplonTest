@@ -1,0 +1,12 @@
+FROM alpine:latest
+
+# Install SQLite
+RUN apk add --no-cache sqlite
+
+# Create app directory and set permissions
+RUN mkdir -p /app/db && \
+    chown -R 1000:1000 /app
+
+WORKDIR /app/db
+
+CMD ["tail", "-f", "/dev/null"]
