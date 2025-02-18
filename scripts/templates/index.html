@@ -4,80 +4,231 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Database Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .chart-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        margin-bottom: 40px;
+      }
+      .chart-box {
+        width: 45%;
+        margin-bottom: 20px;
+      }
+      .tables-container {
+        margin-top: 40px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      th, td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      h1 {
+        margin-top: 30px;
+        margin-bottom: 15px;
+      }
+    </style>
   </head>
   <body>
     <div class="container">
-      <h1>Sales</h1>
-      <table border="1">
-        <tr>
-          <th>ID</th>
-          <th>Product ID</th>
-          <th>Store ID</th>
-          <th>Date</th>
-          <th>Amount</th>
-        </tr>
-        {% for sale in sales %}
-        <tr>
-          <td>{{ sale.id }}</td>
-          <td>{{ sale.product_id }}</td>
-          <td>{{ sale.store_id }}</td>
-          <td>{{ sale.date }}</td>
-          <td>{{ sale.amount }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+      <h1>Sales Dashboard</h1>
+      
+      <div class="chart-container">
+        <div class="chart-box">
+          <h2>Sales by Product</h2>
+          <canvas id="productSalesChart"></canvas>
+        </div>
+        <div class="chart-box">
+          <h2>Sales by Region</h2>
+          <canvas id="regionSalesChart"></canvas>
+        </div>
+      </div>
+      
+      <div class="tables-container">
+        <h1>Sales</h1>
+        <table>
+          <tr>
+            <th>ID</th>
+            <th>Product ID</th>
+            <th>Store ID</th>
+            <th>Date</th>
+            <th>Amount</th>
+          </tr>
+          {% for sale in sales %}
+          <tr>
+            <td>{{ sale.id }}</td>
+            <td>{{ sale.product_id }}</td>
+            <td>{{ sale.store_id }}</td>
+            <td>{{ sale.date }}</td>
+            <td>{{ sale.amount }}</td>
+          </tr>
+          {% endfor %}
+        </table>
 
-      <h1>Products</h1>
-      <table border="1">
-        <tr>
-          <th>ID</th>
-          <th>Product ID</th>
-          <th>Name</th>
-          <th>Price</th>
-          <th>Stock</th>
-        </tr>
-        {% for product in products %}
-        <tr>
-          <td>{{ product.id }}</td>
-          <td>{{ product.product_id }}</td>
-          <td>{{ product.name }}</td>
-          <td>{{ product.price }}</td>
-          <td>{{ product.stock }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+        <h1>Products</h1>
+        <table>
+          <tr>
+            <th>Product ID</th>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Stock</th>
+          </tr>
+          {% for product in products %}
+          <tr>
+            <td>{{ product.product_id }}</td>
+            <td>{{ product.name }}</td>
+            <td>{{ product.price }}</td>
+            <td>{{ product.stock }}</td>
+          </tr>
+          {% endfor %}
+        </table>
 
-      <h1>Stores</h1>
-      <table border="1">
-        <tr>
-          <th>ID</th>
-          <th>City</th>
-          <th>Number of Employees</th>
-        </tr>
-        {% for store in stores %}
-        <tr>
-          <td>{{ store.id }}</td>
-          <td>{{ store.city }}</td>
-          <td>{{ store.number_of_employees }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+        <h1>Stores</h1>
+        <table>
+          <tr>
+            <th>ID</th>
+            <th>City</th>
+            <th>Number of Employees</th>
+          </tr>
+          {% for store in stores %}
+          <tr>
+            <td>{{ store.id }}</td>
+            <td>{{ store.city }}</td>
+            <td>{{ store.number_of_employees }}</td>
+          </tr>
+          {% endfor %}
+        </table>
 
-      <h1>Analysis Results</h1>
-      <table border="1">
-        <tr>
-          <th>ID</th>
-          <th>Metric</th>
-          <th>Value</th>
-        </tr>
-        {% for result in analysis_results %}
-        <tr>
-          <td>{{ result.id }}</td>
-          <td>{{ result.metric }}</td>
-          <td>{{ result.value }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+        <h1>Analysis Results</h1>
+        <table>
+          <tr>
+            <th>ID</th>
+            <th>Metric</th>
+            <th>Value</th>
+          </tr>
+          {% for result in analysis_results %}
+          <tr>
+            <td>{{ result.id }}</td>
+            <td>{{ result.metric }}</td>
+            <td>{{ result.value }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
     </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Generate random colors
+        function getRandomColors(count) {
+          var colors = [];
+          for (var i = 0; i < count; i++) {
+            var r = Math.floor(Math.random() * 255);
+            var g = Math.floor(Math.random() * 255);
+            var b = Math.floor(Math.random() * 255);
+            colors.push(`rgba(${r}, ${g}, ${b}, 0.8)`);
+          }
+          return colors;
+        }
+        
+        // Product Sales Chart
+        var productData = {{ product_sales_data|tojson }};
+        if (productData && productData.length > 0) {
+          var productLabels = productData.map(item => item.label);
+          var productValues = productData.map(item => item.value);
+          var productColors = getRandomColors(productLabels.length);
+          
+          var productCtx = document.getElementById('productSalesChart').getContext('2d');
+          var productChart = new Chart(productCtx, {
+            type: 'pie',
+            data: {
+              labels: productLabels,
+              datasets: [{
+                data: productValues,
+                backgroundColor: productColors,
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: 'right',
+                },
+                title: {
+                  display: true,
+                  text: 'Sales by Product'
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      var label = context.label || '';
+                      var value = context.parsed || 0;
+                      return label + ': $' + value.toFixed(2);
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+        
+        // Region Sales Chart
+        var regionData = {{ region_sales_data|tojson }};
+        if (regionData && regionData.length > 0) {
+          var regionLabels = regionData.map(item => item.label);
+          var regionValues = regionData.map(item => item.value);
+          var regionColors = getRandomColors(regionLabels.length);
+          
+          var regionCtx = document.getElementById('regionSalesChart').getContext('2d');
+          var regionChart = new Chart(regionCtx, {
+            type: 'pie',
+            data: {
+              labels: regionLabels,
+              datasets: [{
+                data: regionValues,
+                backgroundColor: regionColors,
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: 'right',
+                },
+                title: {
+                  display: true,
+                  text: 'Sales by Region'
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      var label = context.label || '';
+                      var value = context.parsed || 0;
+                      return label + ': $' + value.toFixed(2);
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+      });
+    </script>
   </body>
 </html>
