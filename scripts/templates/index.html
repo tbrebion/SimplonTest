@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Database Viewer</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Sales</h1>
+      <table border="1">
+        <tr>
+          <th>ID</th>
+          <th>Product ID</th>
+          <th>Store ID</th>
+          <th>Date</th>
+          <th>Amount</th>
+        </tr>
+        {% for sale in sales %}
+        <tr>
+          <td>{{ sale.id }}</td>
+          <td>{{ sale.product_id }}</td>
+          <td>{{ sale.store_id }}</td>
+          <td>{{ sale.date }}</td>
+          <td>{{ sale.amount }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <h1>Products</h1>
+      <table border="1">
+        <tr>
+          <th>ID</th>
+          <th>Product ID</th>
+          <th>Name</th>
+          <th>Price</th>
+          <th>Stock</th>
+        </tr>
+        {% for product in products %}
+        <tr>
+          <td>{{ product.id }}</td>
+          <td>{{ product.product_id }}</td>
+          <td>{{ product.name }}</td>
+          <td>{{ product.price }}</td>
+          <td>{{ product.stock }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <h1>Stores</h1>
+      <table border="1">
+        <tr>
+          <th>ID</th>
+          <th>City</th>
+          <th>Number of Employees</th>
+        </tr>
+        {% for store in stores %}
+        <tr>
+          <td>{{ store.id }}</td>
+          <td>{{ store.city }}</td>
+          <td>{{ store.number_of_employees }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <h1>Analysis Results</h1>
+      <table border="1">
+        <tr>
+          <th>ID</th>
+          <th>Metric</th>
+          <th>Value</th>
+        </tr>
+        {% for result in analysis_results %}
+        <tr>
+          <td>{{ result.id }}</td>
+          <td>{{ result.metric }}</td>
+          <td>{{ result.value }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </body>
+</html>

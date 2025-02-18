@@ -1,7 +1,6 @@
 import sqlite3
 import pandas as pd
 
-
 try:
     conn = sqlite3.connect('/app/db/database.db')
     print("Successfully connected to database")
@@ -10,60 +9,62 @@ except Exception as e:
     raise e
 cursor = conn.cursor()
 
-
-cursor.execute('DROP TABLE IF EXISTS sales')
-cursor.execute('DROP TABLE IF EXISTS products')
-cursor.execute('DROP TABLE IF EXISTS stores')
-cursor.execute('DROP TABLE IF EXISTS analysis_results')
-
-
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS sales (
-    id TEXT PRIMARY KEY,
-    product_id TEXT,
-    store_id INTEGER,
-    date TEXT,
-    amount REAL
-)
-''')
-
+# Create tables if they don't exist with proper foreign key relationships
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    product_id TEXT,
-    name TEXT,
-    price REAL,
-	stock INTEGER
+    product_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL CHECK (price >= 0),
+    stock INTEGER NOT NULL CHECK (stock >= 0)
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS stores (
     id INTEGER PRIMARY KEY,
-    city TEXT,
-    number_of_employees INTEGER
+    city TEXT NOT NULL,
+    number_of_employees INTEGER NOT NULL CHECK (number_of_employees >= 0)
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS sales (
+    id TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL,
+    store_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL CHECK (amount >= 0),
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    FOREIGN KEY (store_id) REFERENCES stores(id)
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS analysis_results (
-    id INTEGER PRIMARY KEY,
-    metric TEXT,
-    value REAL
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    metric TEXT NOT NULL,
+    value REAL NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ''')
-
-conn.commit()
-
-
 
 def import_data_from_csv(file_path, table_name, column_mapping, dtype_mapping):
     df = pd.read_csv(file_path)
     df.rename(columns=column_mapping, inplace=True)
     df = df.astype(dtype_mapping)
+    
+    if table_name in ['products', 'stores']:
+        # For products and stores, only insert if they don't exist
+        existing_ids = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+        if not existing_ids.empty:
+            print(f"Table {table_name} already has data, skipping import")
+            return
+            
+    elif table_name == 'sales':
+        # For sales, clear existing data before inserting new
+        cursor.execute('DELETE FROM sales')
+        
     df.to_sql(table_name, conn, if_exists='append', index=False)
-
-
 
 sales_column_mapping = {
     'Date': 'date',
@@ -105,11 +106,15 @@ stores_dtype_mapping = {
     'number_of_employees': int
 }
 
-import_data_from_csv('/app/data/sales.csv', 'sales', sales_column_mapping, sales_dtype_mapping)
+# Import data with the new logic
 import_data_from_csv('/app/data/products.csv', 'products', products_column_mapping, products_dtype_mapping)
 import_data_from_csv('/app/data/stores.csv', 'stores', stores_column_mapping, stores_dtype_mapping)
+import_data_from_csv('/app/data/sales.csv', 'sales', sales_column_mapping, sales_dtype_mapping)
 
+# Clear existing analysis results before new calculation
+cursor.execute('DELETE FROM analysis_results')
 
+# Calculate sales by product
 cursor.execute('''
 SELECT product_id, SUM(amount) FROM sales GROUP BY product_id
 ''')
@@ -124,6 +129,7 @@ price_dict = {product_id: price for product_id, price in price_by_product}
 
 result = {product_id: total_sales * price_dict[product_id] for product_id, total_sales in sales_by_product}
 
+# Calculate sales by region with proper joins
 cursor.execute('''
 SELECT stores.city, SUM(sales.amount * products.price) AS total_revenue
 FROM sales
@@ -133,19 +139,17 @@ GROUP BY stores.city
 ''')
 sales_by_region = cursor.fetchall()
 
-
 total = sum(result.values())
 
+# Insert new analysis results
 cursor.execute('''
 INSERT INTO analysis_results (metric, value) VALUES (?, ?)
 ''', ('total_revenue', total))
-
 
 for product_id, value in result.items():
     cursor.execute('''
     INSERT INTO analysis_results (metric, value) VALUES (?, ?)
     ''', (f'sales_product_{product_id}', value))
-
 
 for city, amount in sales_by_region:
     cursor.execute('''

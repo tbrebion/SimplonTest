@@ -10,4 +10,11 @@ RUN pip install -r requirements.txt
 
 COPY scripts/ .
 
-CMD ["python", "hello_world.py"]
+# Install Flask
+RUN pip install Flask
+
+# Expose the port Flask will run on
+EXPOSE 5000
+
+# Run hello_world.py before starting the Flask app
+CMD ["sh", "-c", "python hello_world.py && python app.py"]
