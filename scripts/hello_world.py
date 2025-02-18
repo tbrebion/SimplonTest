@@ -1,5 +1,7 @@
 import sqlite3
 import pandas as pd
+import requests
+import io
 
 try:
     conn = sqlite3.connect('/app/db/database.db')
@@ -48,23 +50,45 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 )
 ''')
 
-def import_data_from_csv(file_path, table_name, column_mapping, dtype_mapping):
-    df = pd.read_csv(file_path)
-    df.rename(columns=column_mapping, inplace=True)
-    df = df.astype(dtype_mapping)
-    
-    if table_name in ['products', 'stores']:
-        # For products and stores, only insert if they don't exist
-        existing_ids = pd.read_sql(f"SELECT * FROM {table_name}", conn)
-        if not existing_ids.empty:
-            print(f"Table {table_name} already has data, skipping import")
-            return
-            
-    elif table_name == 'sales':
-        # For sales, clear existing data before inserting new
-        cursor.execute('DELETE FROM sales')
+def import_data_from_url(url, table_name, column_mapping, dtype_mapping):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
         
-    df.to_sql(table_name, conn, if_exists='append', index=False)
+        # Read CSV data from the response content
+        csv_data = io.StringIO(response.text)
+        df = pd.read_csv(csv_data)
+        
+        df.rename(columns=column_mapping, inplace=True)
+        df = df.astype(dtype_mapping)
+        
+        if table_name in ['products', 'stores']:
+            # For products and stores, only insert if they don't exist
+            existing_ids = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+            if not existing_ids.empty:
+                print(f"Table {table_name} already has data, skipping import")
+                return
+                
+        elif table_name == 'sales':
+            # For sales, clear existing data before inserting new
+            cursor.execute('DELETE FROM sales')
+            
+            # Generate a unique ID for each sale if it doesn't exist
+            if 'id' not in df.columns:
+                df['id'] = [f"SALE_{i}" for i in range(len(df))]
+            
+        df.to_sql(table_name, conn, if_exists='append', index=False)
+        print(f"Successfully imported data for {table_name}")
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data from URL for {table_name}: {str(e)}")
+    except Exception as e:
+        print(f"Error processing data for {table_name}: {str(e)}")
+
+# Define URLs
+products_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSawI56WBC64foMT9pKCiY594fBZk9Lyj8_bxfgmq-8ck_jw1Z49qDeMatCWqBxehEVoM6U1zdYx73V/pub?gid=0&single=true&output=csv"
+stores_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSawI56WBC64foMT9pKCiY594fBZk9Lyj8_bxfgmq-8ck_jw1Z49qDeMatCWqBxehEVoM6U1zdYx73V/pub?gid=714623615&single=true&output=csv"
+sales_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSawI56WBC64foMT9pKCiY594fBZk9Lyj8_bxfgmq-8ck_jw1Z49qDeMatCWqBxehEVoM6U1zdYx73V/pub?gid=760830694&single=true&output=csv"
 
 sales_column_mapping = {
     'Date': 'date',
@@ -106,10 +130,10 @@ stores_dtype_mapping = {
     'number_of_employees': int
 }
 
-# Import data with the new logic
-import_data_from_csv('/app/data/products.csv', 'products', products_column_mapping, products_dtype_mapping)
-import_data_from_csv('/app/data/stores.csv', 'stores', stores_column_mapping, stores_dtype_mapping)
-import_data_from_csv('/app/data/sales.csv', 'sales', sales_column_mapping, sales_dtype_mapping)
+# Import data with HTTP requests
+import_data_from_url(products_url, 'products', products_column_mapping, products_dtype_mapping)
+import_data_from_url(stores_url, 'stores', stores_column_mapping, stores_dtype_mapping)
+import_data_from_url(sales_url, 'sales', sales_column_mapping, sales_dtype_mapping)
 
 # Clear existing analysis results before new calculation
 cursor.execute('DELETE FROM analysis_results')
@@ -127,7 +151,7 @@ price_by_product = cursor.fetchall()
 
 price_dict = {product_id: price for product_id, price in price_by_product}
 
-result = {product_id: total_sales * price_dict[product_id] for product_id, total_sales in sales_by_product}
+result = {product_id: total_sales * price_dict.get(product_id, 0) for product_id, total_sales in sales_by_product}
 
 # Calculate sales by region with proper joins
 cursor.execute('''
