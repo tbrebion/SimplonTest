@@ -54,14 +54,13 @@ def import_data_from_url(url, table_name, column_mapping, dtype_mapping):
     try:
         response = requests.get(url)
         response.raise_for_status()  # Raise an exception for HTTP errors
-        
+
         # Read CSV data from the response content
         csv_data = io.StringIO(response.text)
-        df = pd.read_csv(csv_data)
-        
+        df = pd.read_csv(csv_data, encoding='utf-8')
+        df.columns = df.columns.str.replace('Ã©', 'é')
         df.rename(columns=column_mapping, inplace=True)
         df = df.astype(dtype_mapping)
-        
         if table_name in ['products', 'stores']:
             # For products and stores, only insert if they don't exist
             existing_ids = pd.read_sql(f"SELECT * FROM {table_name}", conn)
